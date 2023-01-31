@@ -23,8 +23,8 @@ spec:
             limits:
               cpu: 2
               memory: 50Mi
-              baidu.com/xpu: 1
+              baidu.com/xpu: 2
             requests:
               cpu: 2
               memory: 50Mi
-              baidu.com/xpu: 1
+              baidu.com/xpu: 2
