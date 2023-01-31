@@ -1,0 +1,165 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tas-topology-updater
+spec: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rte
+  namespace: tas-topology-updater
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rte
+  namespace: tas-topology-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rte
+subjects:
+- kind: ServiceAccount
+  name: rte
+  namespace: tas-topology-updater
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rte
+rules:
+- apiGroups:
+  - topology.node.k8s.io
+  resources:
+  - noderesourcetopologies
+  verbs:
+  - create
+  - update
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rte
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rte
+subjects:
+- kind: ServiceAccount
+  name: rte
+  namespace: tas-topology-updater
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: resource-topology-exporter
+  namespace: tas-topology-updater
+spec:
+  selector:
+    matchLabels:
+      name: resource-topology
+  template:
+    metadata:
+      labels:
+        name: resource-topology
+    spec:
+      containers:
+      - args:
+        - --sleep-interval=10s
+        - --sysfs=/host-sys
+        - --podresources-socket=unix:///host-podresources-socket/kubelet.sock
+        - --notify-file=/host-run-rte/notify
+        - --kubelet-config-file=/host-var-lib-kubelet/config.yaml
+        - --kubelet-state-dir=/host-var-lib-kubelet
+        command:
+        - /bin/resource-topology-exporter
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: REFERENCE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: REFERENCE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REFERENCE_CONTAINER_NAME
+          value: shared-pool-container
+        - name: METRICS_PORT
+          value: "2112"
+        image: tizhou86/xpu-resource-topology-exporter:v0.9.0
+        imagePullPolicy: Always
+        name: resource-topology-exporter
+        ports:
+        - containerPort: 2112
+          name: metrics-port
+        resources: {}
+        volumeMounts:
+        - mountPath: /host-sys
+          name: host-sys
+          readOnly: true
+        - mountPath: /host-podresources-socket/kubelet.sock
+          name: host-podresources-socket
+        - mountPath: /host-run-rte
+          name: host-run-rte
+        - mountPath: /host-var-lib-kubelet
+          name: host-var-lib-kubelet
+          readOnly: true
+      - image: registry.cn-hangzhou.aliyuncs.com/google_containers/pause-amd64:3.0
+        name: shared-pool-container
+        resources: {}
+      readinessGates:
+      - conditionType: PodresourcesFetched
+      - conditionType: NodeTopologyUpdated
+      serviceAccountName: rte
+      volumes:
+      - hostPath:
+          path: /sys
+          type: Directory
+        name: host-sys
+      - hostPath:
+          path: /var/lib/kubelet/pod-resources/kubelet.sock
+          type: Socket
+        name: host-podresources-socket
+      - hostPath:
+          path: /run/rte
+          type: DirectoryOrCreate
+        name: host-run-rte
+      - hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+        name: host-var-lib-kubelet
+  updateStrategy: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rte
+  namespace: tas-topology-updater

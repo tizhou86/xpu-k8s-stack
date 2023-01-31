@@ -1,0 +1,600 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: podgroups.scheduling.sigs.k8s.io
+spec:
+  group: scheduling.sigs.k8s.io
+  names:
+    kind: PodGroup
+    plural: podgroups
+    shortNames:
+    - pg
+    - pgs
+    singular: podgroup
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            properties:
+              minMember:
+                minimum: 1
+                type: integer
+              minResources:
+                additionalProperties:
+                  type: string
+                type: object
+              scheduleTimeoutSeconds:
+                type: integer
+            type: object
+          status:
+            properties:
+              failed:
+                default: 0
+                type: integer
+              occupiedBy:
+                type: string
+              phase:
+                type: string
+              running:
+                default: 0
+                type: integer
+              scheduleStartTime:
+                format: date-time
+                type: string
+              scheduled:
+                default: 0
+                type: integer
+              succeeded:
+                default: 0
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tas-scheduler
+spec: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topology-aware-scheduler
+rules:
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
+  - coordination.k8s.io
+  resourceNames:
+  - kube-scheduler
+  resources:
+  - leases
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resourceNames:
+  - kube-scheduler
+  resources:
+  - endpoints
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - delete
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - bindings
+  - pods/binding
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - replicationcontrollers
+  - services
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  - extensions
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csinodes
+  - storageclasses
+  - csidrivers
+  - csistoragecapacities
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - scheduling.sigs.k8s.io
+  resources:
+  - podgroups
+  - elasticquotas
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - topology.node.k8s.io
+  resources:
+  - noderesourcetopologies
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topology-aware-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topology-aware-scheduler
+subjects:
+- kind: ServiceAccount
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+---
+apiVersion: v1
+data:
+  scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1beta2
+    clientConnection:
+      acceptContentTypes: ""
+      burst: 100
+      contentType: application/vnd.kubernetes.protobuf
+      kubeconfig: ""
+      qps: 50
+    enableContentionProfiling: true
+    enableProfiling: true
+    healthzBindAddress: ""
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: false
+      leaseDuration: 15s
+      renewDeadline: 10s
+      resourceLock: leases
+      resourceName: kube-scheduler
+      resourceNamespace: kube-system
+      retryPeriod: 2s
+    metricsBindAddress: ""
+    parallelism: 16
+    percentageOfNodesToScore: 0
+    podInitialBackoffSeconds: 1
+    podMaxBackoffSeconds: 10
+    profiles:
+    - pluginConfig:
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          cacheResyncPeriodSeconds: 0
+          kind: NodeResourceTopologyMatchArgs
+          scoringStrategy:
+            resources:
+            - name: cpu
+              weight: 1
+            - name: memory
+              weight: 1
+            type: LeastAllocated
+        name: NodeResourceTopologyMatch
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          kind: DefaultPreemptionArgs
+          minCandidateNodesAbsolute: 100
+          minCandidateNodesPercentage: 10
+        name: DefaultPreemption
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          hardPodAffinityWeight: 1
+          kind: InterPodAffinityArgs
+        name: InterPodAffinity
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          kind: NodeAffinityArgs
+        name: NodeAffinity
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          kind: NodeResourcesBalancedAllocationArgs
+          resources:
+          - name: cpu
+            weight: 1
+          - name: memory
+            weight: 1
+        name: NodeResourcesBalancedAllocation
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          kind: NodeResourcesFitArgs
+          scoringStrategy:
+            resources:
+            - name: cpu
+              weight: 1
+            - name: memory
+              weight: 1
+            type: LeastAllocated
+        name: NodeResourcesFit
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          defaultingType: System
+          kind: PodTopologySpreadArgs
+        name: PodTopologySpread
+      - args:
+          apiVersion: kubescheduler.config.k8s.io/v1beta2
+          bindTimeoutSeconds: 600
+          kind: VolumeBindingArgs
+        name: VolumeBinding
+      plugins:
+        bind:
+          enabled:
+          - name: DefaultBinder
+            weight: 0
+        filter:
+          enabled:
+          - name: NodeUnschedulable
+            weight: 0
+          - name: NodeName
+            weight: 0
+          - name: TaintToleration
+            weight: 0
+          - name: NodeAffinity
+            weight: 0
+          - name: NodePorts
+            weight: 0
+          - name: NodeResourcesFit
+            weight: 0
+          - name: VolumeRestrictions
+            weight: 0
+          - name: EBSLimits
+            weight: 0
+          - name: GCEPDLimits
+            weight: 0
+          - name: NodeVolumeLimits
+            weight: 0
+          - name: AzureDiskLimits
+            weight: 0
+          - name: VolumeBinding
+            weight: 0
+          - name: VolumeZone
+            weight: 0
+          - name: PodTopologySpread
+            weight: 0
+          - name: InterPodAffinity
+            weight: 0
+          - name: NodeResourceTopologyMatch
+            weight: 0
+        multiPoint: {}
+        permit: {}
+        postBind: {}
+        postFilter:
+          enabled:
+          - name: DefaultPreemption
+            weight: 0
+        preBind:
+          enabled:
+          - name: VolumeBinding
+            weight: 0
+        preFilter:
+          enabled:
+          - name: NodeResourcesFit
+            weight: 0
+          - name: NodePorts
+            weight: 0
+          - name: VolumeRestrictions
+            weight: 0
+          - name: PodTopologySpread
+            weight: 0
+          - name: InterPodAffinity
+            weight: 0
+          - name: VolumeBinding
+            weight: 0
+          - name: NodeAffinity
+            weight: 0
+        preScore:
+          enabled:
+          - name: InterPodAffinity
+            weight: 0
+          - name: PodTopologySpread
+            weight: 0
+          - name: TaintToleration
+            weight: 0
+          - name: NodeAffinity
+            weight: 0
+        queueSort:
+          enabled:
+          - name: PrioritySort
+            weight: 0
+        reserve:
+          enabled:
+          - name: VolumeBinding
+            weight: 0
+          - name: NodeResourceTopologyMatch
+            weight: 0
+        score:
+          enabled:
+          - name: NodeResourcesBalancedAllocation
+            weight: 1
+          - name: ImageLocality
+            weight: 1
+          - name: InterPodAffinity
+            weight: 1
+          - name: NodeResourcesFit
+            weight: 1
+          - name: NodeAffinity
+            weight: 1
+          - name: PodTopologySpread
+            weight: 2
+          - name: TaintToleration
+            weight: 1
+          - name: NodeResourceTopologyMatch
+            weight: 0
+      schedulerName: topology-aware-scheduler
+kind: ConfigMap
+metadata:
+  name: scheduler-config
+  namespace: tas-scheduler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topology-aware-scheduler-as-kube-scheduler
+  namespace: tas-topology-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: scheduler
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: scheduler
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        component: scheduler
+    spec:
+      containers:
+      - args:
+        - /bin/kube-scheduler
+        - --config=/etc/kubernetes/scheduler-config.yaml
+        - --v=4
+        image: tizhou86/kube-scheduler:v0.24.9
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10259
+            scheme: HTTPS
+          initialDelaySeconds: 15
+        name: topology-aware-scheduler
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10259
+            scheme: HTTPS
+        resources:
+          limits:
+            cpu: 200m
+            memory: 500Mi
+          requests:
+            cpu: 200m
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /etc/kubernetes
+          name: scheduler-config
+          readOnly: true
+      serviceAccountName: topology-aware-scheduler
+      volumes:
+      - configMap:
+          name: scheduler-config
+        name: scheduler-config
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: topology-aware-controller
+  namespace: tas-scheduler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: topology-aware-controller
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - scheduling.sigs.k8s.io
+  resources:
+  - podgroups
+  - elasticquotas
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: topology-aware-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topology-aware-controller
+subjects:
+- kind: ServiceAccount
+  name: topology-aware-controller
+  namespace: tas-scheduler
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: topology-aware-controller
+  name: topology-aware-controller
+  namespace: tas-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: topology-aware-controller
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: topology-aware-controller
+    spec:
+      containers:
+      - image: tizhou86/kube-scheduler:v0.24.9
+        imagePullPolicy: Always
+        name: topology-aware-controller
+        resources:
+          requests:
+            cpu: 100m
+      serviceAccount: topology-aware-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: topology-aware-controller-as-kube-controller
+  namespace: tas-topology-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: topology-aware-controller
+  namespace: tas-scheduler
