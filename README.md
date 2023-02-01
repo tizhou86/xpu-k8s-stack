@@ -8,12 +8,23 @@ If your cluster don't have xpu device plugin installed, you should deploy it wit
 
 For using the xpu resource topology:
 
+Delete the old cpu manager state file:
+
+```
+rm -rf /var/lib/kubelet/cpu_manager_state
+```
+
 You should configure the kubelet config file (normally located at /var/lib/kubelet/config.yaml) by adding following arguments:
 
 ```
-cpuManagerPolicy: static
-memoryManagerPolicy: static
-topologyManagerPolicy: single-numa-node
+topologyManagerPolicy: "single-numa-node"
+cpuManagerPolicy: "static"
+reservedSystemCPUs: "0"
+# memoryManagerPolicy: "Static"
+# systemReserved: {"memory" :"512Mi"}
+# kubeReserved: {"memory" :"512Mi"}
+# evictionHard: {"memory.available": "100Mi"}
+# reservedMemory: [{"numaNode": 0, "limits": {"memory": "1124Mi"}}]
 
 ```
 And then restart the Kubelet service.
@@ -30,6 +41,8 @@ Start up the exporter for collecting topology from kubelet sock.
 kubectl apply -f deployment/xpu-resource-topology/xpu-resource-topology-exporter.yaml
 
 ```
+
+Check whether the related pod under the tas-topology-updater namespace is in running status. 
 
 Start up the scheduler plugin for using the topology aware scheduler.
 
