@@ -15,7 +15,7 @@ rm -rf /var/lib/kubelet/cpu_manager_state
 rm -rf /var/lib/kubelet/memory_manager_state
 ```
 
-You should configure the kubelet config file (normally located at /var/lib/kubelet/config.yaml) by adding following arguments.
+You should configure the kubelet config file (normally located at `/var/lib/kubelet/config.yaml`) by adding following arguments.
 Reserved memory and cpu can be adjusted according to the real user scenario:
 
 ```
@@ -49,7 +49,6 @@ Start up the scheduler plugin for using the topology aware scheduler.
 ```
 kubectl apply -f deployment/xpu-resource-topology/xpu-topology-aware-scheduler.yaml
 ```
-
 
 ### Testing
 
