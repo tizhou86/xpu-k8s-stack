@@ -60,4 +60,12 @@ kubectl apply -f deployment/test-yaml/test-with-device.yaml
 ```
 
 
+### Deleting and Cleaning
 
+```
+kubectl delete -f deployment/xpu-resource-topology/xpu-topology-aware-scheduler.yaml
+kubectl delete -f deployment/xpu-resource-topology/xpu-resource-topology-exporter.yaml
+kubectl delete -f deployment/xpu-resource-topology/noderesourcetopology-crd.yaml
+rm -rf /var/lib/kubelet/cpu_manager_state
+rm -rf /var/lib/kubelet/memory_manager_state
+```
