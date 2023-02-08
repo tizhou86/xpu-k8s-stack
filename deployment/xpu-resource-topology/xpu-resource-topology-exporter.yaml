@@ -114,7 +114,7 @@ spec:
           value: shared-pool-container
         - name: METRICS_PORT
           value: "2112"
-        image: tizhou86/xpu-resource-topology-exporter:v0.9.0
+        image: tizhou86/xpu-resource-topology-exporter:v4.0.25
         imagePullPolicy: Always
         name: resource-topology-exporter
         ports:

@@ -50,7 +50,7 @@ spec:
       priorityClassName: "system-node-critical"
       containers:
         # use stable xpu-device-plugin image from dockehub in default
-        - image: tizhou86/xpu-device-plugin:v1.0.4
+        - image: tizhou86/xpu-device-plugin:v4.0.25
           name: xpu-device-plugin-ctr
           command:
             - xpu-device-plugin
