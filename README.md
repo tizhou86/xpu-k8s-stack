@@ -13,6 +13,7 @@ Delete the old cpu manager state file:
 ```
 rm -rf /var/lib/kubelet/cpu_manager_state
 rm -rf /var/lib/kubelet/memory_manager_state
+rm -rf /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
 ```
 
 You should configure the kubelet config file (normally located at `/var/lib/kubelet/config.yaml`) by adding following arguments.
@@ -52,12 +53,24 @@ kubectl apply -f deployment/xpu-resource-topology/xpu-topology-aware-scheduler.y
 
 ### Testing
 
+Currently we support 1, 2, 4, 8 device scheduling for r480.
+
+For 1, 2, 4 device scheduling, the schedulerName is `topology-aware-scheduler`
 
 For testing purpose:
 
 ```
 kubectl apply -f deployment/test-yaml/test-with-device.yaml
 ```
+
+For 8 device scheduling, the schedulerName is `default-scheduler`
+
+For testing purpose:
+
+```
+kubectl apply -f deployment/test-yaml/test-with-8-device.yaml
+```
+
 
 
 ### Deleting and Cleaning
@@ -68,4 +81,5 @@ kubectl delete -f deployment/xpu-resource-topology/xpu-resource-topology-exporte
 kubectl delete -f deployment/xpu-resource-topology/noderesourcetopology-crd.yaml
 rm -rf /var/lib/kubelet/cpu_manager_state
 rm -rf /var/lib/kubelet/memory_manager_state
+rm -rf /var/lib/kubelet/device-plugins/kubelet_internal_checkpoint
 ```
