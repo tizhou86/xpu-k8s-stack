@@ -68,7 +68,7 @@ kubectl apply -f deployment/test-yaml/test-with-4-device.yaml
 You can use `kubectl exec` to exec into the related container and execute:
 
 ```
-ls | grep '^xpu' | sed 's/^xpu//' | head -n -1 | tr '\n' ',' | sed 's/,$//'
+ls /dev | grep '^xpu' | sed 's/^xpu//' | head -n -1 | tr '\n' ',' | sed 's/,$//'
 ```
 
 to get the corresponding xpu device id list.
