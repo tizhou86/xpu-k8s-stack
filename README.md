@@ -2,7 +2,7 @@
 
 ### Prerequisite
 
-If your cluster don't have xpu device plugin installed, you should deploy it with the yaml under the deployment/xpu-device-plugin, choose either dedicated mode or shared mode.
+If your cluster don't have xpu device plugin installed, you should deploy it with the yaml under the deployment/xpu-device-plugin.
 
 ### Usage
 
@@ -60,10 +60,21 @@ For 1, 2, 4 device scheduling, the schedulerName is `topology-aware-scheduler`
 For testing purpose:
 
 ```
-kubectl apply -f deployment/test-yaml/test-with-device.yaml
+kubectl apply -f deployment/test-yaml/test-with-1-device.yaml
+kubectl apply -f deployment/test-yaml/test-with-2-device.yaml
+kubectl apply -f deployment/test-yaml/test-with-4-device.yaml
 ```
 
-For 8 device scheduling, the schedulerName is `default-scheduler`
+You can use `kubectl exec` to exec into the related container and execute:
+
+```
+ls | grep '^xpu' | sed 's/^xpu//' | head -n -1 | tr '\n' ',' | sed 's/,$//'
+```
+
+to get the corresponding xpu device id list.
+
+For 8 device scheduling, since it will occupy all the devices on single machine, the schedulerName is 
+`default-scheduler`
 
 For testing purpose:
 
@@ -71,9 +82,7 @@ For testing purpose:
 kubectl apply -f deployment/test-yaml/test-with-8-device.yaml
 ```
 
-
-
-### Deleting and Cleaning
+### Cleaning up
 
 ```
 kubectl delete -f deployment/xpu-resource-topology/xpu-topology-aware-scheduler.yaml
