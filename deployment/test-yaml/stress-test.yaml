@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stress-test
+spec:
+  selector:
+    matchLabels:
+      name: test
+  template:
+    metadata:
+      labels:
+        name: test
+    spec:
+      # schedulerName: topology-aware-scheduler
+      schedulerName: default-scheduler
+      containers:
+        - name: stress-test
+          image: tizhou86/xpu_test:v0.1
+          imagePullPolicy: Always
+          command: ["bash", "test_launch.sh"]
+          resources:
+            limits:
+              cpu: 2
+              memory: 50Mi
+              baidu.com/xpu: 1
+            requests:
+              cpu: 2
+              memory: 50Mi
+              baidu.com/xpu: 1
