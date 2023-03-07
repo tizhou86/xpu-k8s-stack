@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: xpu-exporter
+  namespace: kube-system
+  labels:
+    k8s-app: xpu-exporter
+spec:
+  selector:
+    matchLabels:
+      k8s-app: xpu-exporter
+  template:
+    metadata:
+      labels:
+        k8s-app: xpu-exporter
+    spec:
+      hostNetwork: true
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - image: tizhou86/xpu_exporter:v4.0.25.2
+          imagePullPolicy: Always
+          name: xpu-exporter
+          command: ["/usr/bin/xpu_exporter", "--web.listen-address=0.0.0.0:9507"]
+          ports:
+            - containerPort: 9507
+              protocol: TCP
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            runAsUser: 0
+            privileged: true
+          volumeMounts:
+            - name: docker
+              mountPath: /var/run/docker.sock
+              readOnly: true
+            - name: kubelet
+              mountPath: /var/lib/kubelet/pod-resources/kubelet.sock
+              readOnly: true
+      volumes:
+        - name: docker
+          hostPath:
+            path: /var/run/docker.sock
+        - name: kubelet
+          hostPath:
+            path: /var/lib/kubelet/pod-resources/kubelet.sock

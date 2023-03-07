@@ -1,0 +1,23 @@
+apiVersion: batch.paddlepaddle.org/v1
+kind: PaddleJob
+metadata:
+  name: simple
+spec:
+  cleanPodPolicy: Never
+  worker:
+    replicas: 2
+    template:
+      spec:
+        containers:
+          - name: simple
+            image: registry.baidubce.com/paddlepaddle/paddle:2.4.0rc0-xpu-r480
+            command:
+              - python
+            args:
+              - "-m"
+              - "paddle.distributed.launch"
+              - "run_check"
+            imagePullPolicy: Always
+            resources:
+              limits:
+                baidu.com/xpu: 2
